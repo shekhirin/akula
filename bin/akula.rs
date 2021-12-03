@@ -11,10 +11,7 @@ use akula::{
         sentry_client_connector::SentryClientConnectorImpl,
         sentry_client_reactor::SentryClientReactor,
     },
-    stagedsync::{
-        self,
-        stage::{ExecOutput, Stage, StageInput, UnwindInput},
-    },
+    stagedsync::{self, stage::*},
     stages::*,
     version_string, Cursor, MutableCursor, MutableTransaction, StageId, Transaction,
 };
@@ -120,12 +117,15 @@ where
         let mut erigon_td_cur = erigon_tx.cursor(&tables::HeadersTotalDifficulty).await?;
         let mut td_cur = tx.mutable_cursor(&tables::HeadersTotalDifficulty).await?;
 
-        assert_eq!(
-            erigon_tx
-                .get(&tables::CanonicalHeader, highest_block)
-                .await?,
-            tx.get(&tables::CanonicalHeader, highest_block).await?
-        );
+        if erigon_tx
+            .get(&tables::CanonicalHeader, highest_block)
+            .await?
+            != tx.get(&tables::CanonicalHeader, highest_block).await?
+        {
+            return Ok(ExecOutput::Unwind {
+                unwind_to: BlockNumber(highest_block.0 - 1),
+            });
+        }
 
         let mut walker = erigon_canonical_cur.walk(Some(highest_block + 1));
         while let Some((block_number, canonical_hash)) = walker.try_next().await? {
@@ -169,7 +169,7 @@ where
         })
     }
 
-    async fn unwind<'tx>(&self, _: &'tx mut RwTx, _: UnwindInput) -> anyhow::Result<()>
+    async fn unwind<'tx>(&self, _: &'tx mut RwTx, _: UnwindInput) -> anyhow::Result<UnwindOutput>
     where
         'db: 'tx,
     {
@@ -371,7 +371,7 @@ where
             must_commit: highest_block > original_highest_block,
         })
     }
-    async fn unwind<'tx>(&self, _: &'tx mut RwTx, _: UnwindInput) -> anyhow::Result<()>
+    async fn unwind<'tx>(&self, _: &'tx mut RwTx, _: UnwindInput) -> anyhow::Result<UnwindOutput>
     where
         'db: 'tx,
     {
@@ -419,11 +419,18 @@ where
             },
         )
     }
-    async fn unwind<'tx>(&self, _: &'tx mut RwTx, _: UnwindInput) -> anyhow::Result<()>
+    async fn unwind<'tx>(
+        &self,
+        _: &'tx mut RwTx,
+        input: UnwindInput,
+    ) -> anyhow::Result<UnwindOutput>
     where
         'db: 'tx,
     {
-        Ok(())
+        Ok(UnwindOutput {
+            stage_progress: input.unwind_to,
+            must_commit: true,
+        })
     }
 }
 
