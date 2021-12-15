@@ -208,6 +208,17 @@ where
         const MAX_TXS_PER_BATCH: usize = 500_000;
         const BUFFERING_FACTOR: usize = 500_000;
         let erigon_tx = self.db.begin().await?;
+
+        if erigon_tx
+            .get(&tables::CanonicalHeader, highest_block)
+            .await?
+            != tx.get(&tables::CanonicalHeader, highest_block).await?
+        {
+            return Ok(ExecOutput::Unwind {
+                unwind_to: BlockNumber(highest_block.0 - 1),
+            });
+        }
+
         let mut canonical_header_cur = tx.cursor(&tables::CanonicalHeader).await?;
 
         let mut erigon_body_cur = erigon_tx.cursor(&tables::BlockBody).await?;
@@ -232,7 +243,7 @@ where
             .unwrap();
 
         let mut starting_index = prev_body.base_tx_id + prev_body.tx_amount as u64;
-        let mut walker = canonical_header_cur.walk(Some(highest_block + 1));
+        let mut canonical_header_walker = canonical_header_cur.walk(Some(highest_block + 1));
         let mut batch = Vec::with_capacity(BUFFERING_FACTOR);
         let mut converted = Vec::with_capacity(BUFFERING_FACTOR);
 
@@ -243,7 +254,7 @@ where
         let done = loop {
             let mut no_more_bodies = false;
             let mut accum_txs = 0;
-            while let Some((block_num, block_hash)) = walker.try_next().await? {
+            while let Some((block_num, block_hash)) = canonical_header_walker.try_next().await? {
                 if let Some((_, body)) = erigon_body_cur.seek_exact((block_num, block_hash)).await?
                 {
                     let base_tx_id = body.base_tx_id;
@@ -332,6 +343,10 @@ where
                 for (index, tx) in txs {
                     tx_cur.append(index, tx).await?;
                 }
+            }
+
+            if no_more_bodies {
+                break true;
             }
 
             let now = Instant::now();
