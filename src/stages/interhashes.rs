@@ -634,16 +634,10 @@ where
                 .with_context(|| "Failed to update interhashes")?
             };
 
-            let block_state_root = accessors::chain::header::read(
-                tx,
-                accessors::chain::canonical_hash::read(tx, max_block)
-                    .await?
-                    .ok_or_else(|| format_err!("No canonical hash for block {}", max_block))?,
-                max_block,
-            )
-            .await?
-            .ok_or_else(|| format_err!("No header for block {}", max_block))?
-            .state_root;
+            let block_state_root = accessors::chain::header::read(tx, max_block)
+                .await?
+                .ok_or_else(|| format_err!("No header for block {}", max_block))?
+                .state_root;
 
             if block_state_root == trie_root {
                 info!("Block #{} state root OK: {:?}", max_block, trie_root)

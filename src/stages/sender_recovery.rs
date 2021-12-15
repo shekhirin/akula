@@ -53,14 +53,14 @@ where
             .await?
             .map(|v| v.tx_num);
         let done = loop {
-            while let Some(((block_number, hash), body)) = walker.try_next().await? {
+            while let Some((block_number, body)) = walker.try_next().await? {
                 let txs = tx_cur
                     .walk(Some(body.base_tx_id.encode().to_vec()))
                     .take(body.tx_amount)
                     .map(|res| res.map(|(_, tx)| tx))
                     .collect::<anyhow::Result<Vec<_>>>()
                     .await?;
-                batch.push((block_number, hash, txs));
+                batch.push((block_number, txs));
 
                 highest_block = block_number;
 
@@ -75,7 +75,7 @@ where
 
             let mut recovered_senders = batch
                 .par_drain(..)
-                .filter_map(move |(block_number, hash, txs)| {
+                .filter_map(move |(block_number, txs)| {
                     if !txs.is_empty() {
                         let senders = txs
                             .into_iter()
@@ -90,8 +90,7 @@ where
 
                         Some(senders.map(|senders| {
                             (
-                                ErasedTable::<tables::TxSender>::encode_key((block_number, hash))
-                                    .to_vec(),
+                                ErasedTable::<tables::TxSender>::encode_key(block_number).to_vec(),
                                 senders.encode(),
                             )
                         }))
@@ -166,7 +165,7 @@ where
     {
         let mut senders_cur = tx.mutable_cursor(&tables::TxSender).await?;
 
-        while let Some(((block_number, _), _)) = senders_cur.last().await? {
+        while let Some((block_number, _)) = senders_cur.last().await? {
             if block_number > input.unwind_to {
                 senders_cur.delete_current().await?;
             } else {
@@ -334,15 +333,9 @@ mod tests {
         let hash2 = H256::random();
         let hash3 = H256::random();
 
-        chain::storage_body::write(&tx, hash1, 1, &block1)
-            .await
-            .unwrap();
-        chain::storage_body::write(&tx, hash2, 2, &block2)
-            .await
-            .unwrap();
-        chain::storage_body::write(&tx, hash3, 3, &block3)
-            .await
-            .unwrap();
+        chain::storage_body::write(&tx, 1, &block1).await.unwrap();
+        chain::storage_body::write(&tx, 2, &block2).await.unwrap();
+        chain::storage_body::write(&tx, 3, &block3).await.unwrap();
 
         chain::canonical_hash::write(&tx, 1, hash1).await.unwrap();
         chain::canonical_hash::write(&tx, 2, hash2).await.unwrap();
@@ -375,13 +368,13 @@ mod tests {
             }
         );
 
-        let senders1 = chain::tx_sender::read(&tx, hash1, 1);
+        let senders1 = chain::tx_sender::read(&tx, 1);
         assert_eq!(senders1.await.unwrap(), [sender1, sender1]);
 
-        let senders2 = chain::tx_sender::read(&tx, hash2, 2);
+        let senders2 = chain::tx_sender::read(&tx, 2);
         assert_eq!(senders2.await.unwrap(), [sender1, sender2, sender2]);
 
-        let senders3 = chain::tx_sender::read(&tx, hash3, 3);
+        let senders3 = chain::tx_sender::read(&tx, 3);
         assert!(senders3.await.unwrap().is_empty());
     }
 }

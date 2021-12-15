@@ -55,15 +55,8 @@ where
                     info!("Building cumulative index for block {}", block_num);
                 }
 
-                let canonical_hash = tx.get(&tables::CanonicalHeader, block_num).await?.unwrap();
-                let header = tx
-                    .get(&tables::Header, (block_num, canonical_hash))
-                    .await?
-                    .unwrap();
-                let body = tx
-                    .get(&tables::BlockBody, (block_num, canonical_hash))
-                    .await?
-                    .unwrap();
+                let header = tx.get(&tables::Header, block_num).await?.unwrap();
+                let body = tx.get(&tables::BlockBody, block_num).await?.unwrap();
 
                 gas += header.gas_used;
                 tx_num += body.tx_amount as u64;

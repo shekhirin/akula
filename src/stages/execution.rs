@@ -57,22 +57,17 @@ async fn execute_batch_of_blocks<'db, Tx: MutableTransaction<'db>>(
     let mut last_message = Instant::now();
     let mut printed_at_least_once = false;
     loop {
-        let block_hash = accessors::chain::canonical_hash::read(tx, block_number)
+        let header = accessors::chain::header::read(tx, block_number)
             .await?
-            .ok_or_else(|| format_err!("No canonical hash found for block {}", block_number))?;
-        let header = accessors::chain::header::read(tx, block_hash, block_number)
-            .await?
-            .ok_or_else(|| format_err!("Header not found: {}/{:?}", block_number, block_hash))?
+            .ok_or_else(|| format_err!("Header not found: {}", block_number))?
             .into();
-        let block = accessors::chain::block_body::read_with_senders(tx, block_hash, block_number)
+        let block = accessors::chain::block_body::read_with_senders(tx, block_number)
             .await?
-            .ok_or_else(|| {
-                format_err!("Block body not found: {}/{:?}", block_number, block_hash)
-            })?;
+            .ok_or_else(|| format_err!("Block body not found: {}", block_number))?;
 
         let block_spec = chain_config.collect_block_spec(block_number);
 
-        ExecutionProcessor::new(
+        if let Err(e) = ExecutionProcessor::new(
             &mut buffer,
             &mut analysis_cache,
             &mut *consensus_engine,
@@ -82,12 +77,15 @@ async fn execute_batch_of_blocks<'db, Tx: MutableTransaction<'db>>(
         )
         .execute_and_write_block()
         .await
-        .with_context(|| {
-            format!(
+        {
+            let block_hash = accessors::chain::canonical_hash::read(tx, block_number)
+                .await?
+                .ok_or_else(|| format_err!("No canonical hash found for block {}", block_number))?;
+            return Err(e.context(format!(
                 "Failed to execute block #{} ({:?})",
                 block_number, block_hash
-            )
-        })?;
+            )));
+        };
 
         gas_since_start += header.gas_used;
         gas_since_last_message += header.gas_used;
