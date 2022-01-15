@@ -3,14 +3,13 @@ use crate::{
     crypto::keccak256,
     etl::collector::*,
     kv::{tables, traits::*},
-    models::{Account, BlockNumber, RlpAccount, EMPTY_ROOT},
+    models::*,
     stagedsync::stage::{ExecOutput, Stage, StageInput, UnwindInput, *},
     stages::stage_util::should_do_clean_promotion,
     StageId,
 };
 use anyhow::{bail, format_err, Context};
 use async_trait::async_trait;
-use ethereum_types::*;
 use futures_core::Stream;
 use rlp::RlpStream;
 use std::{cmp, collections::BTreeMap, sync::Arc};
@@ -667,7 +666,6 @@ mod tests {
         crypto::trie_root, h256_to_u256, kv::new_mem_database, models::EMPTY_HASH, u256_to_h256,
         zeroless_view,
     };
-    use ethereum_types::{H256, U256};
     use hex_literal::hex;
     use proptest::prelude::*;
 
@@ -703,7 +701,7 @@ mod tests {
             balance in any::<[u8; 32]>(),
             code_hash in any::<[u8; 32]>(),
         ) -> Account {
-            let balance = U256::from(balance);
+            let balance = U256::from_be_bytes(balance);
             let code_hash = H256::from(code_hash);
             Account { nonce, balance, code_hash }
         }
@@ -766,7 +764,7 @@ mod tests {
         let mut accounts = BTreeMap::new();
         let account1 = Account {
             nonce: 0,
-            balance: U256::zero(),
+            balance: U256::ZERO,
             code_hash: EMPTY_HASH,
         };
         accounts.insert(H256::from_low_u64_be(1), account1);
@@ -783,12 +781,12 @@ mod tests {
         };
         let a2 = Account {
             nonce: 0,
-            balance: U256::zero(),
+            balance: U256::ZERO,
             code_hash: EMPTY_HASH,
         };
         let a3 = Account {
             nonce: 0,
-            balance: U256::zero(),
+            balance: U256::ZERO,
             code_hash: EMPTY_HASH,
         };
         accounts.insert(
