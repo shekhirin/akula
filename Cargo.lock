@@ -843,7 +843,7 @@ checksum = "77f3309417938f28bf8228fcff79a4a37103981e3e186d2ccd19c74b38f4eb71"
 [[package]]
 name = "evmodin"
 version = "0.1.0"
-source = "git+https://github.com/vorot93/evmodin?branch=const-revision#f69762245a538f24470ee83bda06cf5e862f8a40"
+source = "git+https://github.com/vorot93/evmodin?branch=better-api#bbf9ddd0f7dad29bc7815802161c02e462c0c687"
 dependencies = [
  "arrayref",
  "arrayvec",

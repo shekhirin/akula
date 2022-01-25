@@ -36,7 +36,7 @@ ethnum = { git = "https://github.com/vorot93/ethnum-rs", branch = "staging", fea
     "rlp",
     "scale",
 ] }
-evmodin = { git = "https://github.com/vorot93/evmodin", branch = "const-revision" }
+evmodin = { git = "https://github.com/vorot93/evmodin", branch = "better-api" }
 futures-core = "0.3"
 futures-util = "0.3"
 hash-db = "0.15"
